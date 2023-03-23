@@ -1,45 +1,50 @@
 import React, {useState} from "react"
 
-import useStore from "../../../store"
+import {authStore, useStore} from "../../../store"
 import {createItem} from "../../../actions"
 import {CheckboxRow, Message, Modal, TextInputRow} from "juno-ui-components"
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import DatacenterMenu from "./DatacenterMenu";
 import {currentState, push} from "url-state-provider";
+import {Error, Loading} from "../../Components";
 
-const NewMemberModal = ({poolID}) => {
+const NewMemberModal = () => {
     const endpoint = useStore((state) => state.endpoint)
     const urlStateKey = useStore((state) => state.urlStateKey)
+    const auth = authStore((state) => state.auth)
+    const urlState = currentState(urlStateKey)
     const queryClient = useQueryClient()
+    const [error, setError] = useState()
     const [formState, setFormState] = useState({
         name: undefined,
         address: undefined,
         datacenter_id: undefined,
         port: undefined,
         admin_state_up: true,
-        pool_id: poolID,
+        pool_id: urlState?.pool,
     })
-    const [error, setError] = useState()
-    const mutation = useMutation(
-        ({endpoint, body}) => createItem("members", endpoint, body)
-    )
+
+    const {mutate} = useMutation(createItem)
 
     const closeModal = () => {
-        const urlState = currentState(urlStateKey)
         push(urlStateKey, {...urlState, currentModal: ""})
     }
 
     const onSubmit = () => {
-        mutation.mutate(
+        mutate(
             {
+                key: "members",
                 endpoint: endpoint,
-                body: {"member": formState},
+                token: auth?.token,
+                formState: {"member": formState},
             },
             {
-                onSuccess: () => {
-                    closeModal()
-                    // refetch
-                    queryClient.invalidateQueries("members")
+                onSuccess: (data) => {
+                    queryClient
+                        .setQueryData(["members", data.member.id, endpoint], data)
+                    queryClient
+                        .invalidateQueries("members")
+                        .then(closeModal)
                 },
                 onError: setError
             }
@@ -58,11 +63,9 @@ const NewMemberModal = ({poolID}) => {
             confirmButtonLabel="Save new Member"
             onConfirm={onSubmit}
         >
-            {error && (
-                <Message variant="danger">
-                    {`${error.statusCode}, ${error.message}`}
-                </Message>
-            )}
+            {/* Error Bar */}
+            <Error error={error} />
+
             <CheckboxRow
                 id="selectable"
                 label="Enabled"

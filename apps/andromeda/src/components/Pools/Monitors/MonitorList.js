@@ -1,4 +1,5 @@
-import React from "react"
+import React, {useState} from "react"
+
 import {
     Box,
     Button,
@@ -10,26 +11,34 @@ import {
     Stack,
 } from "juno-ui-components"
 import MonitorListItem from "./MonitorListItem"
-import useStore from "../../../store"
+import {authStore, useStore} from "../../../store"
 import { currentState, push } from "url-state-provider"
 import {fetchAll, nextPageParam} from "../../../actions";
 import {useInfiniteQuery} from '@tanstack/react-query';
+import {Error, Loading} from "../../Components";
 
-const MonitorList = ({setSelectedPool}) => {
+const MonitorList = ({poolID, setSelectedPool}) => {
     const urlStateKey = useStore((state) => state.urlStateKey)
     const endpoint = useStore((state) => state.endpoint)
+    const auth = authStore((state) => state.auth)
+    const [error, setError] = useState()
+
     const {
         data,
-        error,
-        status,
+        isLoading,
+        isSuccess,
         fetchNextPage,
         hasNextPage,
         isFetching,
         isFetchingNextPage,
     } = useInfiniteQuery(
-        [`monitors`, endpoint],
+        [`monitors`, endpoint, {pool_id: poolID}],
         fetchAll,
-        {getNextPageParam: nextPageParam}
+        {
+            getNextPageParam: nextPageParam,
+            meta: auth?.token,
+            onError: setError
+        }
     )
     const handleNewMonitorClick = () => {
         const urlState = currentState(urlStateKey)
@@ -67,21 +76,12 @@ const MonitorList = ({setSelectedPool}) => {
             </Stack>
 
             {/* Error Bar */}
-            {status === 'error' && (
-                <Message variant="danger">
-                    {`${error.statusCode}, ${error.message}`}
-                </Message>
-            )}
+            <Error error={error} />
 
             {/* Loading indicator for page content */}
-            {status === 'loading' && (
-                <Stack className="ml-auto" alignment="center">
-                    <Spinner variant="primary" />
-                    Loading...
-                </Stack>
-            )}
+            <Loading isLoading={isLoading} />
 
-            {status === 'success' && data.pages[0]?.monitors.length ? (
+            {isSuccess && data.pages[0]?.monitors.length ? (
                 <DataGrid columns={5}>
                     <DataGridRow>
                         <DataGridHeadCell>ID/Name</DataGridHeadCell>
@@ -94,7 +94,7 @@ const MonitorList = ({setSelectedPool}) => {
                     {/* Render items: */}
                     {data.pages.map((group, i) =>
                         group.monitors.map((monitor, index) => (
-                            <MonitorListItem key={index} monitor={monitor}/>)
+                            <MonitorListItem key={index} monitor={monitor} setError={setError}/>)
                         )
                     )}
                 </DataGrid>

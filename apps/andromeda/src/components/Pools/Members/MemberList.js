@@ -1,18 +1,23 @@
-import React from "react"
-import {Box, Button, DataGrid, DataGridHeadCell, DataGridRow, Message, Spinner, Stack,} from "juno-ui-components"
+import React, {useState} from "react"
+
+import {Box, Button, DataGrid, DataGridHeadCell, DataGridRow, Stack,} from "juno-ui-components"
 import MemberListItem from "./MemberListItem"
-import useStore from "../../../store"
+import {authStore, useStore} from "../../../store"
 import {currentState, push} from "url-state-provider"
 import {fetchAll, nextPageParam} from "../../../actions";
 import {useInfiniteQuery} from '@tanstack/react-query';
+import {Error, Loading} from "../../Components";
 
 const MemberList = ({poolID, setSelectedPool}) => {
     const urlStateKey = useStore((state) => state.urlStateKey)
     const endpoint = useStore((state) => state.endpoint)
+    const auth = authStore((state) => state.auth)
+    const [error, setError] = useState()
+
     const {
         data,
-        error,
-        status,
+        isLoading,
+        isSuccess,
         fetchNextPage,
         hasNextPage,
         isFetching,
@@ -20,7 +25,11 @@ const MemberList = ({poolID, setSelectedPool}) => {
     } = useInfiniteQuery(
         [`members`, endpoint, {pool_id: poolID}],
         fetchAll,
-        {getNextPageParam: nextPageParam}
+        {
+            getNextPageParam: nextPageParam,
+            meta: auth?.token,
+            onError: setError,
+        }
     )
     const handleNewMemberClick = () => {
         const urlState = currentState(urlStateKey)
@@ -61,21 +70,13 @@ const MemberList = ({poolID, setSelectedPool}) => {
             </Stack>
 
             {/* Error Bar */}
-            {status === 'error' && (
-                <Message variant="danger">
-                    {`${error.statusCode}, ${error.message}`}
-                </Message>
-            )}
+            <Error error={error} />
 
             {/* Loading indicator for page content */}
-            {status === 'loading' && (
-                <Stack className="ml-auto" alignment="center">
-                    <Spinner variant="primary"/>
-                    Loading...
-                </Stack>
-            )}
+            <Loading isLoading={isLoading} />
 
-            {status === 'success' && data.pages[0]?.members.length ? (
+
+            {isSuccess && data.pages[0]?.members.length ? (
                 <DataGrid columns={6}>
                     <DataGridRow>
                         <DataGridHeadCell>ID/Name</DataGridHeadCell>
@@ -89,7 +90,7 @@ const MemberList = ({poolID, setSelectedPool}) => {
                     {/* Render items: */}
                     {data.pages.map((group, i) =>
                         group.members.map((member, index) => (
-                            <MemberListItem key={index} member={member}/>)
+                            <MemberListItem key={index} member={member} setError={setError}/>)
                         )
                     )}
                 </DataGrid>

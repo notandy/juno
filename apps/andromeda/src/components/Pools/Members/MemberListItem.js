@@ -1,28 +1,26 @@
-import React, { useMemo } from "react"
-import {DataGridCell, DataGridRow, Icon, Spinner, Stack} from "juno-ui-components"
-import useStore from "../../../store"
-import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import { currentState, push } from "url-state-provider"
-import {deleteItem, fetchItem} from "../../../actions"
-import {DateTime} from "luxon";
+import React from "react"
 
-const MemberListItem = ({ member }) => {
+import {DataGridCell, DataGridRow, Icon, Spinner, Stack} from "juno-ui-components"
+import {authStore, useStore} from "../../../store"
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {currentState, push} from "url-state-provider"
+import {deleteItem, fetchItem} from "../../../actions"
+
+const MemberListItem = ({ member, setError }) => {
     const urlStateKey = useStore((state) => state.urlStateKey)
     const endpoint = useStore((state) => state.endpoint)
+    const auth = authStore((state) => state.auth)
     const queryClient = useQueryClient()
-    const queryDatacenter = useQuery(
-        [`datacenters`, member.datacenter_id, endpoint], fetchItem)
-    const createdAt = useMemo(() => {
-        if (member.created_at) {
-            return DateTime.fromSQL(member.created_at).toLocaleString(
-                DateTime.DATETIME_SHORT
-            )
-        }
-    }, [member.created_at])
 
-    const mutation = useMutation(
-        ({ endpoint, id }) => deleteItem("members", endpoint, id)
+    const queryDatacenter = useQuery(
+        [`datacenters`, member.datacenter_id, endpoint],
+        fetchItem,
+        {
+            meta: auth?.token,
+            onError: setError,
+        }
     )
+    const mutation = useMutation(deleteItem)
 
     const handleEditMemberClick = () => {
         const urlState = currentState(urlStateKey)
@@ -36,18 +34,18 @@ const MemberListItem = ({ member }) => {
     const handleDeleteMemberClick = () => {
         mutation.mutate(
             {
+                key: "members",
                 endpoint: endpoint,
                 id: member.id,
+                token: auth?.token,
             },
             {
-                onSuccess: (data, variables, context) => {
-                    // refetch members
-                    queryClient.invalidateQueries("members")
+                onSuccess: () => {
+                    queryClient
+                        .invalidateQueries("members")
+                        .then()
                 },
-                onError: (error, variables, context) => {
-                    console.log(error)
-                    // TODO display error
-                },
+                onError: setError,
             }
         )
     }

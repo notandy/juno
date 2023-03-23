@@ -1,13 +1,8 @@
-import React, { useEffect, useState } from "react"
-import {
-  Container,
-  MainTabs,
-  Tab,
-  TabList,
-  TabPanel, IntroBox,
-} from "juno-ui-components"
-import useStore from "./store"
-import { currentState, push, addOnChangeListener } from "url-state-provider"
+import React, {useEffect, useState} from "react"
+
+import {Container, IntroBox, MainTabs, Tab, TabList, TabPanel,} from "juno-ui-components"
+import {useStore} from "./store"
+import {addOnChangeListener, currentState, push} from "url-state-provider"
 import ModalManager from "./components/ModalManager"
 import PanelManager from "./components/PanelManager"
 import DomainList from "./components/Domains/DomainList"
@@ -19,7 +14,6 @@ const AppContent = (props) => {
   const [currentPanel, setCurrentPanel] = useState(null)
   const [currentModal, setCurrentModal] = useState(null)
   const [tabIndex, setTabIndex] = useState(0)
-
 
   // wait until the global state is set to fetch the url state
   useEffect(() => {

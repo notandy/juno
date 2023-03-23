@@ -1,14 +1,17 @@
-import React, {useEffect, useMemo, useState} from "react"
-import {Badge, DataGridCell, DataGridRow, Icon, Label, Spinner, Stack} from "juno-ui-components"
+import React, {useMemo} from "react"
+
+import {Badge, DataGridCell, DataGridRow, Icon, Spinner, Stack} from "juno-ui-components"
 import {useMutation, useQueryClient} from '@tanstack/react-query'
 import {currentState, push} from "url-state-provider"
 import {deleteItem} from "../../actions"
 import {DateTime} from "luxon";
-import useStore from "../../store"
+import {authStore, useStore} from "../../store"
 
-const PoolListItem = ({ pool, setSelectedPool, isActive }) => {
+const PoolListItem = ({pool, setSelectedPool, isActive, setError}) => {
     const urlStateKey = useStore((state) => state.urlStateKey)
     const endpoint = useStore((state) => state.endpoint)
+    const auth = authStore((state) => state.auth)
+    const urlState = currentState(urlStateKey)
     const queryClient = useQueryClient()
     const createdAt = useMemo(() => {
         if (pool.created_at) {
@@ -25,12 +28,9 @@ const PoolListItem = ({ pool, setSelectedPool, isActive }) => {
         }
     }, [pool.updated_at])
 
-    const { isLoading, isError, error, data, isSuccess, mutate } = useMutation(
-        ({ endpoint, id }) => deleteItem("pools", endpoint, id)
-    )
+    const {mutate} = useMutation(deleteItem)
 
     const handleEditPoolClick = () => {
-        const urlState = currentState(urlStateKey)
         push(urlStateKey, {
             ...urlState,
             currentPanel: "Pool",
@@ -41,24 +41,23 @@ const PoolListItem = ({ pool, setSelectedPool, isActive }) => {
     const handleDeletePoolClick = () => {
         mutate(
             {
+                key: "pools",
                 endpoint: endpoint,
                 id: pool.id,
+                token: auth?.token,
             },
             {
-                onSuccess: (data, variables, context) => {
-                    // refetch pools
-                    queryClient.invalidateQueries("pools")
+                onSuccess: () => {
+                    queryClient
+                        .invalidateQueries("pools")
+                        .then()
                 },
-                onError: (error, variables, context) => {
-                    console.log(error)
-                    // TODO display error
-                },
+                onError: setError
             }
         )
     }
 
     const handlePoolClick = () => {
-        const urlState = currentState(urlStateKey)
         push(urlStateKey, {
             ...urlState,
             pool: pool.id,
@@ -70,7 +69,7 @@ const PoolListItem = ({ pool, setSelectedPool, isActive }) => {
         <DataGridRow>
             <DataGridCell>
                 <Stack alignment="center">
-                    {pool.provisioning_status !== 'ACTIVE' ? <Spinner variant="primary" size="small" /> : null}
+                    {pool.provisioning_status !== 'ACTIVE' ? <Spinner variant="primary" size="small"/> : null}
                     <div
                         className={`cursor-pointer ${isActive ? "jn-text-theme-accent" : "hover:text-theme-accent"}`}
                         onClick={handlePoolClick}

@@ -177,7 +177,13 @@ module.exports = (_, argv) => {
       host: "0.0.0.0",
       proxy: {
         '/v1': 'http://127.0.0.1:8080',
+        '/v3': {
+          target: 'https://identity-3.qa-de-2.cloud.sap',
+          secure: false,
+          changeOrigin: true
+        },
       },
+
 
       historyApiFallback: true,
       allowedHosts: "all",

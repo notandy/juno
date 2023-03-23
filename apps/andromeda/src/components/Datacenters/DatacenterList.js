@@ -1,28 +1,33 @@
 import React, {useState} from "react"
+
 import {Box, Button, DataGrid, DataGridHeadCell, DataGridRow, Message, Spinner, Stack,} from "juno-ui-components"
 import DatacenterListItem from "./DatacenterListItem"
-import useStore from "../../store"
+import {authStore, useStore} from "../../store"
 import {currentState, push} from "url-state-provider"
 import {fetchAll, nextPageParam} from "../../actions";
 import {useInfiniteQuery} from '@tanstack/react-query';
+import {Error, Loading} from "../Components";
 
 const DatacenterList = () => {
     const urlStateKey = useStore((state) => state.urlStateKey)
     const endpoint = useStore((state) => state.endpoint)
+    const auth = authStore((state) => state.auth)
     const [error, setError] = useState()
     const {
         data,
-        status,
+        isSuccess,
         fetchNextPage,
         hasNextPage,
+        isLoading,
         isFetching,
         isFetchingNextPage,
     } = useInfiniteQuery(
         ["datacenters", endpoint],
         fetchAll,
         {
-            onError: setError,
-            getNextPageParam: nextPageParam
+            getNextPageParam: nextPageParam,
+            meta: auth?.token,
+            onError: setError
         }
     )
 
@@ -34,19 +39,10 @@ const DatacenterList = () => {
     return (
         <>
             {/* Error Bar */}
-            {error && (
-                <Message variant="danger">
-                    {`${error.statusCode}, ${error.message}`}
-                </Message>
-            )}
+            <Error error={error} />
 
             {/* Loading indicator for page content */}
-            {status === 'loading' && (
-                <Stack className="ml-auto" alignment="center">
-                    <Spinner variant="primary"/>
-                    Loading...
-                </Stack>
-            )}
+            <Loading isLoading={isLoading} />
 
             <Stack
                 distribution="between"
@@ -63,7 +59,7 @@ const DatacenterList = () => {
                     label="Add a Datacenter"
                 />
             </Stack>
-            {status === 'success' ? (
+            {isSuccess ? (
                 <DataGrid columns={9}>
                     <DataGridRow>
                         <DataGridHeadCell>ID/Name</DataGridHeadCell>

@@ -1,15 +1,16 @@
 import React, {useState} from "react"
 
-import useStore from "../../store"
+import {authStore, useStore} from "../../store"
 import {useMutation, useQueryClient} from '@tanstack/react-query'
 import {createItem} from "../../actions"
-import {Modal, TextInputRow, SelectRow, SelectOption, Checkbox, Stack, Message, CheckboxRow} from "juno-ui-components"
+import {CheckboxRow, Message, Modal, SelectOption, SelectRow, Stack, TextInputRow} from "juno-ui-components"
 import {currentState, push} from "url-state-provider"
-import {create} from 'zustand'
+import {Error} from "../Components";
 
 const NewDatacenterModal = () => {
     const urlStateKey = useStore((state) => state.urlStateKey)
     const endpoint = useStore((state) => state.endpoint)
+    const auth = authStore((state) => state.auth)
     const queryClient = useQueryClient()
     const [formState, setFormState] = useState({
         name: undefined,
@@ -23,9 +24,7 @@ const NewDatacenterModal = () => {
         provider: "akamai",
     })
 
-    const {isLoading, isError, error, data, isSuccess, mutate} = useMutation(
-        ({endpoint, body}) => createItem("datacenters", endpoint, body)
-    )
+    const {error, mutate} = useMutation(createItem)
 
     const closeNewDatacenterModal = () => {
         const urlState = currentState(urlStateKey)
@@ -35,14 +34,18 @@ const NewDatacenterModal = () => {
     const onSubmit = () => {
         mutate(
             {
+                key: "datacenters",
+                token: auth?.token,
                 endpoint: endpoint,
-                body: {"datacenter": formState},
+                formState: {"datacenter": formState},
             },
             {
-                onSuccess: (data, variables, context) => {
-                    closeNewDatacenterModal()
-                    // refetch
-                    queryClient.invalidateQueries("datacenters")
+                onSuccess: (data) => {
+                    queryClient
+                        .setQueryData(["datacenters", data.datacenter.id, endpoint], data)
+                    queryClient
+                        .invalidateQueries("datacenters")
+                        .then(closeNewDatacenterModal)
                 }
             }
         )
@@ -60,11 +63,9 @@ const NewDatacenterModal = () => {
             confirmButtonLabel="Save new Datacenter"
             onConfirm={onSubmit}
         >
-            {isError && (
-                <Message variant="danger">
-                    {`${error.statusCode}, ${error.message}`}
-                </Message>
-            )}
+            {/* Error Bar */}
+            <Error error={error} />
+
             <CheckboxRow
                 id="selectable"
                 label="Enabled"
@@ -115,20 +116,20 @@ const NewDatacenterModal = () => {
                 onChange={handleChange}
             />
             <Stack gap="2">
-            <TextInputRow
-                label="Longitude"
-                type="number"
-                helptext="Specifies the geographical longitude of the data center's position."
-                value={formState.longitude?.toString()}
-                onChange={(event) => setFormState({...formState, longitude: parseFloat(event.target.value)})}
-            />
-            <TextInputRow
-                label="Latitude"
-                type="number"
-                helptext="Specifies the geographic latitude of the data center's position."
-                value={formState.latitude?.toString()}
-                onChange={(event) => setFormState({...formState, latitude: parseFloat(event.target.value)})}
-            />
+                <TextInputRow
+                    label="Longitude"
+                    type="number"
+                    helptext="Specifies the geographical longitude of the data center's position."
+                    value={formState.longitude?.toString()}
+                    onChange={(event) => setFormState({...formState, longitude: parseFloat(event.target.value)})}
+                />
+                <TextInputRow
+                    label="Latitude"
+                    type="number"
+                    helptext="Specifies the geographic latitude of the data center's position."
+                    value={formState.latitude?.toString()}
+                    onChange={(event) => setFormState({...formState, latitude: parseFloat(event.target.value)})}
+                />
             </Stack>
         </Modal>
     )

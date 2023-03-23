@@ -1,24 +1,28 @@
 import React, {useState} from "react"
 
-import useStore from "../../../store"
+import {authStore, useStore} from "../../../store"
 import {useMutation, useQueryClient} from '@tanstack/react-query'
 import {createItem} from "../../../actions"
 import {
-    Modal,
-    TextInputRow,
-    Message,
+    Button,
+    ButtonRow,
     CheckboxRow,
-    TextareaRow,
-    SelectRow,
+    Modal,
     SelectOption,
-    ButtonRow, Button, Stack
+    SelectRow,
+    Stack,
+    TextareaRow,
+    TextInputRow
 } from "juno-ui-components"
 import {currentState, push} from "url-state-provider"
+import {Error} from "../../Components";
 
 const NewMonitorModal = ({poolID}) => {
     const urlStateKey = useStore((state) => state.urlStateKey)
     const endpoint = useStore((state) => state.endpoint)
+    const auth = authStore((state) => state.auth)
     const queryClient = useQueryClient()
+    const [advancedSettings, setAdvancedSettings] = useState(false)
     const [formState, setFormState] = useState({
         name: "",
         pool_id: poolID,
@@ -29,11 +33,8 @@ const NewMonitorModal = ({poolID}) => {
         interval: 60,
         admin_state_up: true,
     })
-    const [advancedSettings, setAdvancedSettings] = useState(false)
 
-    const {isLoading, isError, error, data, isSuccess, mutate} = useMutation(
-        ({endpoint, body}) => createItem(`monitors`, endpoint, body)
-    )
+    const {error, mutate} = useMutation(createItem)
 
     const closeNewMonitorModal = () => {
         const urlState = currentState(urlStateKey)
@@ -43,14 +44,18 @@ const NewMonitorModal = ({poolID}) => {
     const onSubmit = () => {
         mutate(
             {
+                key: "monitors",
                 endpoint: endpoint,
-                body: {"monitor": formState},
+                token: auth?.token,
+                formState: {"monitor": formState},
             },
             {
-                onSuccess: (data, variables, context) => {
-                    closeNewMonitorModal()
-                    // refetch
-                    queryClient.invalidateQueries(`monitors`)
+                onSuccess: (data) => {
+                    queryClient
+                        .setQueryData(["monitors", data.monitor.id, endpoint], data)
+                    queryClient
+                        .invalidateQueries(`monitors`)
+                        .then(closeNewMonitorModal)
                 }
             }
         )
@@ -68,11 +73,9 @@ const NewMonitorModal = ({poolID}) => {
             confirmButtonLabel="Save new Monitor"
             onConfirm={onSubmit}
         >
-            {isError && (
-                <Message variant="danger">
-                    {`${error.statusCode}, ${error.message}`}
-                </Message>
-            )}
+            {/* Error Bar */}
+            <Error error={error} />
+
             <CheckboxRow
                 id="selectable"
                 label="Enabled"

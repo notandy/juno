@@ -2,20 +2,24 @@ import React, {useEffect, useState} from "react"
 
 import {Box, Button, DataGrid, DataGridHeadCell, DataGridRow, Message, Spinner, Stack,} from "juno-ui-components"
 import PoolListItem from "./PoolListItem"
-import useStore from "../../store"
+import {authStore, useStore} from "../../store"
 import {currentState, push} from "url-state-provider"
 import {fetchAll, nextPageParam} from "../../actions";
 import {useInfiniteQuery} from '@tanstack/react-query';
 import MemberList from "./Members/MemberList";
 import MonitorList from "./Monitors/MonitorList";
+import {Error, Loading} from "../Components";
 
 const PoolList = () => {
     const urlStateKey = useStore((state) => state.urlStateKey)
     const endpoint = useStore((state) => state.endpoint)
+    const auth = authStore((state) => state.auth)
+    const [error, setError] = useState()
+
     const {
         data,
-        error,
-        status,
+        isLoading,
+        isSuccess,
         fetchNextPage,
         hasNextPage,
         isFetching,
@@ -23,7 +27,11 @@ const PoolList = () => {
     } = useInfiniteQuery(
         ["pools", endpoint],
         fetchAll,
-        {getNextPageParam: nextPageParam}
+        {
+            getNextPageParam: nextPageParam,
+            meta: auth?.token,
+            onError: setError,
+        }
     )
     const handleNewPoolClick = () => {
         const urlState = currentState(urlStateKey)
@@ -39,19 +47,10 @@ const PoolList = () => {
     return (
         <>
             {/* Error Bar */}
-            {status === 'error' && (
-                <Message variant="danger">
-                    {`${error.statusCode}, ${error.message}`}
-                </Message>
-            )}
+            <Error error={error} />
 
             {/* Loading indicator for page content */}
-            {status === 'loading' && (
-                <Stack className="ml-auto" alignment="center">
-                    <Spinner variant="primary" />
-                    Loading...
-                </Stack>
-            )}
+            <Loading isLoading={isLoading} />
 
             <Stack
                 distribution="between"
@@ -68,7 +67,7 @@ const PoolList = () => {
                     label="Add a Pool"
                 />
             </Stack>
-            {status === 'success'? (
+            {isSuccess ? (
                 <DataGrid columns={6}>
                     <DataGridRow>
                         <DataGridHeadCell>ID/Name</DataGridHeadCell>
@@ -87,6 +86,7 @@ const PoolList = () => {
                                 pool={pool}
                                 setSelectedPool={setSelectedPool}
                                 isActive={selectedPool === pool.id}
+                                setError={setError}
                             />)
                         )
                     )}

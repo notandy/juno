@@ -1,7 +1,8 @@
-import React, { useMemo } from "react"
+import React, {useMemo} from "react"
+
 import {Badge, Panel} from "juno-ui-components"
-import useStore from "../store"
-import { currentState, push } from "url-state-provider"
+import {useStore} from "../store"
+import {currentState} from "url-state-provider"
 import EditDomainPanel from "./Domains/EditDomainPanel"
 import EditDatacenterPanel from "./Datacenters/EditDatacenterPanel";
 import EditPoolPanel from "./Pools/EditPoolPanel";
@@ -40,7 +41,7 @@ const PanelManager = ({ currentPanel, closePanel }) => {
   return (
     <Panel
       heading={heading}
-      opened={panelBody() ? true : false}
+      opened={!!panelBody()}
       onClose={closePanel}
     >
       {panelBody()}

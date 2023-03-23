@@ -1,6 +1,6 @@
 import React from "react";
 
-import useStore from "../../store";
+import {authStore, useStore} from "../../store";
 import {useInfiniteQuery} from "@tanstack/react-query";
 import {fetchAll, nextPageParam} from "../../actions";
 import {Menu} from "juno-ui-components/build/Menu";
@@ -9,6 +9,8 @@ import {MenuItem} from "juno-ui-components/build/MenuItem";
 
 const DomainMenu = ({formState, setFormState, setError}) => {
     const endpoint = useStore((state) => state.endpoint)
+    const auth = authStore((state) => state.auth)
+
     const {
         isLoading,
         data,
@@ -16,7 +18,9 @@ const DomainMenu = ({formState, setFormState, setError}) => {
         fetchNextPage,
         isFetching
     } = useInfiniteQuery(["domains", endpoint], fetchAll, {
-        getNextPageParam: nextPageParam, onError: setError
+        getNextPageParam: nextPageParam,
+        meta: auth?.token,
+        onError: setError
     })
 
     const toggleDomain = (id) => {
@@ -50,7 +54,7 @@ const DomainMenu = ({formState, setFormState, setError}) => {
                         : hasNextPage
                             ? 'Load More'
                             : 'Nothing more to load'}
-                onClick={hasNextPage ? () => fetchNextPage() : undefined}
+                onClick={hasNextPage ? () => fetchNextPage() : null}
                 icon={hasNextPage ? "expandMore" : "info"}
             />
         </Menu>

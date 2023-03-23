@@ -1,64 +1,69 @@
-import React, {useEffect, useState} from "react"
+import React, {useState} from "react"
 import {
     Button,
     CheckboxRow,
     Form,
-    Message,
     PanelBody,
     PanelFooter,
     SelectOption,
     SelectRow,
-    Spinner,
     Stack,
     TextInputRow,
 } from "juno-ui-components"
-import useStore from "../../store"
+import {authStore, useStore} from "../../store"
 import {currentState} from "url-state-provider"
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {fetchItem, updateItem} from "../../actions"
+import {fetchItem, updateAttributes, updateItem} from "../../actions"
+import {Error, Loading} from "../Components";
 
 const EditDatacenterPanel = ({closeCallback}) => {
     const urlStateKey = useStore((state) => state.urlStateKey)
     const endpoint = useStore((state) => state.endpoint)
+    const auth = authStore((state) => state.auth)
     const urlState = currentState(urlStateKey)
     const queryClient = useQueryClient()
-    const [formState, setFormState] = useState({})
-    const {isSuccess, isLoading, isError, data, error} = useQuery(
-        ["datacenters", urlState.id, endpoint],
-        fetchItem)
-    const datacenterMutation = useMutation(updateItem)
+    const [error, setError] = useState()
+    const [formState, setFormState] = useState({
+        name: undefined,
+        admin_state_up: true,
+        continent: undefined,
+        country: undefined,
+        state_or_province: undefined,
+        city: undefined,
+        longitude: undefined,
+        latitude: undefined,
+        provider: undefined,
+    })
 
-    useEffect(() => {
-        if (isSuccess) {
-            // Remove unneded attributes from response
-            const {
-                project_id,
-                created_at,
-                updated_at,
-                id,
-                meta,
-                provisioning_status,
-                scope,
-                ...saneData
-            } = data.datacenter
-            setFormState(saneData)
-        }
-    }, [isSuccess])
+    const {isLoading} = useQuery(
+        ["datacenters", urlState.id, endpoint],
+        fetchItem,
+        {
+            meta: auth?.token,
+            onError: setError,
+            onSuccess: (data) => setFormState(updateAttributes(formState, data.datacenter)),
+            refetchOnWindowFocus: false,
+        })
+    const mutation = useMutation(updateItem)
 
     const onSubmit = () => {
-        datacenterMutation.mutate(
+        mutation.mutate(
             {
                 key: "datacenters",
                 id: urlState.id,
                 endpoint: endpoint,
                 formState: {"datacenter": formState},
+                token: auth?.token,
             },
             {
-                onSuccess: (data, variables, context) => {
-                    closeCallback()
-                    // refetch datacenters
-                    queryClient.invalidateQueries("datacenters")
+                onSuccess: (data) => {
+                    queryClient
+                        .setQueryData(["datacenters", data.datacenter.id, endpoint], data)
+                    queryClient
+                        .invalidateQueries("datacenters")
+                        .then(closeCallback)
                 },
+                onError: setError,
             }
         )
     }
@@ -78,25 +83,10 @@ const EditDatacenterPanel = ({closeCallback}) => {
                 }
             >
                 {/* Error Bar */}
-                {isError && (
-                    <Message variant="danger">
-                        {`${error.statusCode}, ${error.message}`}
-                    </Message>
-                )}
-                {datacenterMutation.isError && (
-                    <Message variant="danger">
-                        {`${datacenterMutation.error.statusCode}, ${datacenterMutation.error.message}`}
-                    </Message>
-                )}
-
+                <Error error={error} />
 
                 {/* Loading indicator for page content */}
-                {isLoading && (
-                    <Stack direction="horizontal" alignment="center" distribution="center">
-                        <Spinner variant="primary" size="large"/>
-                        Loading...
-                    </Stack>
-                )}
+                <Loading isLoading={isLoading || mutation.isLoading} />
 
                 <CheckboxRow
                     id="selectable"

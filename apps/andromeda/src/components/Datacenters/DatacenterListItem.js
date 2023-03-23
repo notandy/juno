@@ -1,6 +1,6 @@
 import React, {useMemo} from "react"
 import {DataGridCell, DataGridRow, Icon, Stack} from "juno-ui-components"
-import useStore from "../../store"
+import {authStore, useStore} from "../../store"
 import {useMutation, useQueryClient} from '@tanstack/react-query'
 import {currentState, push} from "url-state-provider"
 import {deleteItem} from "../../actions"
@@ -9,6 +9,7 @@ import {DateTime} from "luxon";
 const DatacenterListItem = ({datacenter, setError}) => {
     const urlStateKey = useStore((state) => state.urlStateKey)
     const endpoint = useStore((state) => state.endpoint)
+    const auth = authStore((state) => state.auth)
     const queryClient = useQueryClient()
     const createdAt = useMemo(() => {
         if (datacenter.created_at) {
@@ -24,9 +25,7 @@ const DatacenterListItem = ({datacenter, setError}) => {
             )
         }
     }, [datacenter.updated_at])
-    const mutation = useMutation(
-        ({endpoint, id}) => deleteItem("datacenters", endpoint, id)
-    )
+    const mutation = useMutation(deleteItem)
 
     const handleEditDatacenterClick = () => {
         const urlState = currentState(urlStateKey)
@@ -40,13 +39,15 @@ const DatacenterListItem = ({datacenter, setError}) => {
     const handleDeleteDatacenterClick = () => {
         mutation.mutate(
             {
+                key: "datacenters",
                 endpoint: endpoint,
                 id: datacenter.id,
+                token: auth?.token,
             },
             {
-                onSuccess: (data, variables, context) => {
+                onSuccess: () => {
                     // refetch datacenters
-                    queryClient.invalidateQueries("datacenters")
+                    queryClient.invalidateQueries("datacenters").then()
                 },
                 onError: setError
             }

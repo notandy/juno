@@ -1,14 +1,16 @@
-import React, { useMemo } from "react"
+import React, {useMemo} from "react"
+
 import {DataGridCell, DataGridRow, Icon, Spinner, Stack} from "juno-ui-components"
-import useStore from "../../store"
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { currentState, push } from "url-state-provider"
+import {authStore, useStore} from "../../store"
+import {useMutation, useQueryClient} from '@tanstack/react-query'
+import {currentState, push} from "url-state-provider"
 import {deleteItem} from "../../actions"
 import {DateTime} from "luxon";
 
-const DomainListItem = ({ domain }) => {
+const DomainListItem = ({domain, setError}) => {
     const urlStateKey = useStore((state) => state.urlStateKey)
     const endpoint = useStore((state) => state.endpoint)
+    const auth = authStore((state) => state.auth)
     const queryClient = useQueryClient()
     const createdAt = useMemo(() => {
         if (domain.created_at) {
@@ -25,9 +27,7 @@ const DomainListItem = ({ domain }) => {
         }
     }, [domain.updated_at])
 
-    const { isLoading, isError, error, data, isSuccess, mutate } = useMutation(
-        ({ endpoint, id }) => deleteItem("domains", endpoint, id)
-    )
+    const {mutate} = useMutation(deleteItem)
 
     const handleEditDomainClick = () => {
         const urlState = currentState(urlStateKey)
@@ -41,18 +41,18 @@ const DomainListItem = ({ domain }) => {
     const handleDeleteDomainClick = () => {
         mutate(
             {
+                key: "domains",
                 endpoint: endpoint,
                 id: domain.id,
+                token: auth?.token
             },
             {
-                onSuccess: (data, variables, context) => {
-                    // refetch domains
-                    queryClient.invalidateQueries("domains")
+                onSuccess: () => {
+                    queryClient
+                        .invalidateQueries(["domains", endpoint])
+                        .then()
                 },
-                onError: (error, variables, context) => {
-                    console.log(error)
-                    // TODO display error
-                },
+                onError: setError
             }
         )
     }
@@ -61,7 +61,7 @@ const DomainListItem = ({ domain }) => {
         <DataGridRow>
             <DataGridCell>
                 <Stack alignment="center">
-                    {domain.provisioning_status !== 'ACTIVE' ? <Spinner variant="primary" size="small" /> : null}
+                    {domain.provisioning_status !== 'ACTIVE' ? <Spinner variant="primary" size="small"/> : null}
                     {domain.name || domain.id}
                 </Stack>
             </DataGridCell>

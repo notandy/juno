@@ -1,15 +1,17 @@
 import React, {useState} from "react"
 
-import useStore from "../../store"
+import {authStore, useStore} from "../../store"
 import {useMutation, useQueryClient} from '@tanstack/react-query'
 import {createItem} from "../../actions"
 import {CheckboxRow, Message, Modal, TextInputRow} from "juno-ui-components"
 import DomainMenu from "./DomainMenu";
 import {currentState, push} from "url-state-provider";
+import {Error, Loading} from "../Components";
 
 const NewPoolModal = () => {
     const endpoint = useStore((state) => state.endpoint)
     const urlStateKey = useStore((state) => state.urlStateKey)
+    const auth = authStore((state) => state.auth)
     const queryClient = useQueryClient()
     const [error, setError] = useState()
     const [formState, setFormState] = useState({
@@ -17,7 +19,8 @@ const NewPoolModal = () => {
         admin_state_up: true,
         domains: [],
     })
-    const mutation = useMutation(({endpoint, body}) => createItem("pools", endpoint, body))
+
+    const {mutate} = useMutation(createItem)
 
     const closeModal = () => {
         const urlState = currentState(urlStateKey)
@@ -25,13 +28,18 @@ const NewPoolModal = () => {
     }
 
     const onSubmit = () => {
-        mutation.mutate({
-            endpoint: endpoint, body: {"pool": formState},
+        mutate({
+            key: "pools",
+            endpoint: endpoint,
+            formState: {"pool": formState},
+            token: auth?.token,
         }, {
-            onSuccess: () => {
-                closeModal()
-                // refetch
-                queryClient.invalidateQueries("pools")
+            onSuccess: (data) => {
+                queryClient
+                    .setQueryData(["pools", data.pool.id, endpoint], data)
+                queryClient
+                    .invalidateQueries("pools")
+                    .then(closeModal)
             },
             onError: setError,
         })
@@ -50,11 +58,7 @@ const NewPoolModal = () => {
             onConfirm={onSubmit}
         >
             {/* Error Bar */}
-            {error && (
-                <Message variant="danger">
-                    {`${error.statusCode}, ${error.message}`}
-                </Message>
-            )}
+            <Error error={error} />
 
             <CheckboxRow
                 id="selectable"

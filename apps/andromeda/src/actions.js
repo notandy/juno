@@ -23,10 +23,11 @@ const checkStatus = (response) => {
         return response
     } else {
         return response.json().then((message) => {
-            var error = new HTTPError(message.code, message.message)
+            const msg = message.error || message
+            const error = new HTTPError(msg.code, msg.message)
             return Promise.reject(error)
-        }, (message) => {
-            var error = new HTTPError(response.status, message || response.statusText)
+        }, () => {
+            const error = new HTTPError(response.status, response.statusText)
             error.statusCode = response.status
             return Promise.reject(error)
         })
@@ -46,7 +47,7 @@ export const nextPageParam = (lastPage, pages) => {
     ).get('marker')
 }
 
-export const fetchAll = ({queryKey, pageParam}) => {
+export const fetchAll = ({queryKey, pageParam, meta}) => {
     const [key, endpoint, options] = queryKey
     // Support for useInfiniteQuery
     const query = encodeUrlParamsFromObject({...options, marker: pageParam})
@@ -54,6 +55,7 @@ export const fetchAll = ({queryKey, pageParam}) => {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
+            "X-Auth-Token": meta,
             Accept: "application/json",
         },
     })
@@ -63,13 +65,14 @@ export const fetchAll = ({queryKey, pageParam}) => {
         })
 }
 
-export const fetchItem = ({queryKey}) => {
+export const fetchItem = ({queryKey, meta}) => {
     const [key, id, endpoint, options] = queryKey
     const query = encodeUrlParamsFromObject(options)
     return fetch(`${endpoint}/${key}/${id}?${query}`, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
+            "X-Auth-Token": meta,
             Accept: "application/json",
         },
     })
@@ -79,13 +82,14 @@ export const fetchItem = ({queryKey}) => {
         })
 }
 
-export const updateItem = ({key, id, endpoint, formState}) => {
+export const updateItem = ({key, id, endpoint, formState, token}) => {
     // Converts a JavaScript value to a JavaScript Object Notation (JSON) string.
     const sendBody = JSON.stringify(formState)
     return fetch(`${endpoint}/${key}/${id}`, {
         method: "PUT",
         headers: {
             "Content-Type": "application/json",
+            "X-Auth-Token": token,
             Accept: "application/json",
         },
         body: sendBody,
@@ -96,21 +100,54 @@ export const updateItem = ({key, id, endpoint, formState}) => {
         })
 }
 
-export const deleteItem = (key, endpoint, id) => {
+export const deleteItem = ({key, endpoint, id, token}) => {
     return fetch(`${endpoint}/${key}/${id}`, {
         method: "DELETE",
         headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
+            "X-Auth-Token": token,
         },
     })
         .then(checkStatus)
 }
 
-export const createItem = (key, endpoint, formState) => {
+export const createItem = ({key, endpoint, formState, token}) => {
     // Converts a JavaScript value to a JavaScript Object Notation (JSON) string.
     const sendBody = JSON.stringify(formState)
     return fetch(`${endpoint}/${key}`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Auth-Token": token,
+            Accept: "application/json",
+        },
+        body: sendBody,
+    })
+        .then(checkStatus)
+        .then((response) => {
+            return response.json()
+        })
+}
+
+export const login = ({endpoint, credentials}) => {
+    const {username, domain, password} = credentials
+    const auth = {
+        auth: {
+            identity: {
+                methods: ["password"],
+                password: {
+                    user: {
+                        name: username,
+                        domain: {
+                            name: domain,
+                        },
+                        password: password,
+                    }
+                }
+            }
+        }
+    }
+    const sendBody = JSON.stringify(auth)
+    return fetch(`${endpoint}/auth/tokens`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -120,6 +157,9 @@ export const createItem = (key, endpoint, formState) => {
     })
         .then(checkStatus)
         .then((response) => {
-            return response.json()
+            return response.json().then(data => {
+                return [response.headers.get("X-Subject-Token"), data.token]
+            })
         })
 }
+

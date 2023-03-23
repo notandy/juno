@@ -1,14 +1,16 @@
-import React, { useMemo } from "react"
-import {Container, DataGridCell, DataGridRow, Icon, Label, Spinner, Stack} from "juno-ui-components"
-import useStore from "../../../store"
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { currentState, push } from "url-state-provider"
+import React, {useMemo} from "react"
+
+import {DataGridCell, DataGridRow, Icon, Spinner, Stack} from "juno-ui-components"
+import {authStore, useStore} from "../../../store"
+import {useMutation, useQueryClient} from '@tanstack/react-query'
+import {currentState, push} from "url-state-provider"
 import {deleteItem} from "../../../actions"
 import {DateTime} from "luxon";
 
-const MonitorListItem = ({ monitor }) => {
+const MonitorListItem = ({monitor, setError}) => {
     const urlStateKey = useStore((state) => state.urlStateKey)
     const endpoint = useStore((state) => state.endpoint)
+    const auth = authStore((state) => state.auth)
     const queryClient = useQueryClient()
     const createdAt = useMemo(() => {
         if (monitor.created_at) {
@@ -25,9 +27,7 @@ const MonitorListItem = ({ monitor }) => {
         }
     }, [monitor.updated_at])
 
-    const { isLoading, isError, error, data, isSuccess, mutate } = useMutation(
-        ({ endpoint, id }) => deleteItem("monitors", endpoint, id)
-    )
+    const {mutate} = useMutation(deleteItem)
 
     const handleEditMonitorClick = () => {
         const urlState = currentState(urlStateKey)
@@ -41,18 +41,18 @@ const MonitorListItem = ({ monitor }) => {
     const handleDeleteMonitorClick = () => {
         mutate(
             {
+                key: "monitors",
                 endpoint: endpoint,
                 id: monitor.id,
+                token: auth?.token,
             },
             {
-                onSuccess: (data, variables, context) => {
-                    // refetch monitors
-                    queryClient.invalidateQueries("monitors")
+                onSuccess: () => {
+                    queryClient
+                        .invalidateQueries("monitors")
+                        .then()
                 },
-                onError: (error, variables, context) => {
-                    console.log(error)
-                    // TODO display error
-                },
+                onError: setError
             }
         )
     }
@@ -61,7 +61,7 @@ const MonitorListItem = ({ monitor }) => {
         <DataGridRow>
             <DataGridCell>
                 <Stack alignment="center">
-                    {monitor.provisioning_status !== 'ACTIVE' ? <Spinner variant="primary" size="small" /> : null}
+                    {monitor.provisioning_status !== 'ACTIVE' ? <Spinner variant="primary" size="small"/> : null}
                     {monitor.name || monitor.id}
                 </Stack>
             </DataGridCell>

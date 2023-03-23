@@ -1,17 +1,29 @@
 import React from "react"
-import { create } from 'zustand'
-import { devtools } from "zustand/middleware"
+import {create} from 'zustand'
+import {createJSONStorage, devtools, persist} from "zustand/middleware"
 
 // global zustand store. See how this works here: https://github.com/pmndrs/zustand
-const useStore = create(
-  devtools((set) => ({
-    // basics
-    endpoint: "v1/",
-    setEndpoint: (newEndpoint) => set((state) => ({ endpoint: newEndpoint })),
-    urlStateKey: "",
-    setUrlStateKey: (newUrlStateKey) =>
-      set((state) => ({ urlStateKey: newUrlStateKey })),
-  }))
+export const useStore = create(
+    devtools((set) => ({
+        // basics
+        endpoint: "v1",
+        setEndpoint: (newEndpoint) => set((state) => ({endpoint: newEndpoint})),
+        urlStateKey: "",
+        setUrlStateKey: (newUrlStateKey) => set((state) => ({urlStateKey: newUrlStateKey})),
+    }))
 )
 
-export default useStore
+export const authStore = create(
+    devtools(
+        persist(
+            (set, get) => ({
+                auth: undefined,
+                setAuth: (newAuth) => set(() => ({auth: newAuth})),
+            }),
+            {
+                name: 'auth',
+                storage: createJSONStorage(() => sessionStorage),
+            }
+        )
+    )
+)

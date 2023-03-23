@@ -4,11 +4,12 @@ import {Menu} from "juno-ui-components/build/Menu";
 import {MenuItem} from "juno-ui-components/build/MenuItem";
 import {useInfiniteQuery} from "@tanstack/react-query";
 import {fetchAll, nextPageParam} from "../../../actions";
-import useStore from "../../../store";
+import {authStore, useStore} from "../../../store";
 
 
 const DatacenterMenu = ({formState, setFormState, setError}) => {
     const endpoint = useStore((state) => state.endpoint)
+    const auth = authStore((state) => state.auth)
     const {
         isLoading,
         data,
@@ -16,7 +17,9 @@ const DatacenterMenu = ({formState, setFormState, setError}) => {
         fetchNextPage,
         isFetching
     } = useInfiniteQuery(["datacenters", endpoint], fetchAll, {
-        getNextPageParam: nextPageParam, onError: setError
+        getNextPageParam: nextPageParam,
+        meta: auth?.token,
+        onError: setError
     })
 
     return (

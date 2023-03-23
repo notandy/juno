@@ -11,17 +11,20 @@ import {
     Stack,
     TextInputRow,
 } from "juno-ui-components"
-import useStore from "../../../store"
+import {authStore, useStore} from "../../../store"
 import {currentState} from "url-state-provider"
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {fetchItem, updateAttributes, updateItem} from "../../../actions"
 import DatacenterMenu from "./DatacenterMenu";
+import {Error, Loading} from "../../Components";
 
 const EditMemberPanel = ({closeCallback}) => {
     const urlStateKey = useStore((state) => state.urlStateKey)
     const endpoint = useStore((state) => state.endpoint)
+    const auth = authStore((state) => state.auth)
     const urlState = currentState(urlStateKey)
     const queryClient = useQueryClient()
+    const [error, setError] = useState()
     const [formState, setFormState] = useState({
         name: undefined,
         address: undefined,
@@ -29,13 +32,14 @@ const EditMemberPanel = ({closeCallback}) => {
         port: undefined,
         admin_state_up: undefined,
     })
-    const [error, setError] = useState()
 
     const {isLoading} = useQuery(
         ["members", urlState.id, endpoint],
         fetchItem, {
+            meta: auth?.token,
             onError: setError,
             onSuccess: (data) => setFormState(updateAttributes(formState, data.pool)),
+            refetchOnWindowFocus: false,
         })
     const mutation = useMutation(updateItem)
 
@@ -45,13 +49,16 @@ const EditMemberPanel = ({closeCallback}) => {
                 key: "members",
                 id: urlState.id,
                 endpoint: endpoint,
+                token: auth?.token,
                 formState: {"member": formState},
             },
             {
-                onSuccess: () => {
-                    closeCallback()
-                    // refetch members
-                    queryClient.invalidateQueries("members")
+                onSuccess: (data) => {
+                    queryClient
+                        .setQueryData(["members", data.member.id, endpoint], data)
+                    queryClient
+                        .invalidateQueries("members")
+                        .then(closeCallback)
                 },
                 onError: setError
             }
@@ -73,19 +80,10 @@ const EditMemberPanel = ({closeCallback}) => {
                 }
             >
                 {/* Error Bar */}
-                {error && (
-                    <Message variant="danger">
-                        {`${error.statusCode}, ${error.message}`}
-                    </Message>
-                )}
+                <Error error={error} />
 
                 {/* Loading indicator for page content */}
-                {isLoading || mutation.isLoading && (
-                    <Stack direction="horizontal" alignment="center" distribution="center">
-                        <Spinner variant="primary" size="large"/>
-                        Loading...
-                    </Stack>
-                )}
+                <Loading isLoading={isLoading || mutation.isLoading} />
 
                 <CheckboxRow
                     id="selectable"
